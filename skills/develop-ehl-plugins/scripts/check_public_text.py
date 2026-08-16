@@ -21,12 +21,19 @@ SKIP_DIRS = {
     "node_modules",
 }
 DEFAULT_WINDOW_SIZE = 3
+DEFAULT_COMPACT_WINDOW_SIZE = 17
 DEFAULT_FORBIDDEN_DIGESTS = frozenset(
     {
         "977c2908e358e8dcae6fbb4db30ba9c8270086a256010014f553a960855cf56b",
     }
 )
+DEFAULT_FORBIDDEN_COMPACT_DIGESTS = frozenset(
+    {
+        "df72b45f82869a738a4b6548b7860129cd368209ac73577210765c4b929b17ee",
+    }
+)
 TOKEN_RE = re.compile(r"[a-z0-9]+")
+ALNUM_RE = re.compile(r"[a-z0-9]")
 
 
 def fail(message: str = "public text guard failed") -> None:
@@ -81,7 +88,42 @@ def contains_forbidden_window(text: str, forbidden_digests: set[str], window_siz
     return bool(token_window_digests(text, window_size) & forbidden_digests)
 
 
-def scan_files(root: Path, forbidden_digests: set[str], window_size: int) -> list[Path]:
+def compact_window_digests(text: str, window_size: int) -> set[str]:
+    compact = "".join(ALNUM_RE.findall(text.casefold()))
+    if len(compact) < window_size:
+        return set()
+    digests: set[str] = set()
+    for index in range(0, len(compact) - window_size + 1):
+        window = compact[index : index + window_size]
+        digests.add(hashlib.sha256(window.encode("utf-8")).hexdigest())
+    return digests
+
+
+def contains_forbidden_compact(text: str, forbidden_digests: set[str], window_size: int) -> bool:
+    return bool(compact_window_digests(text, window_size) & forbidden_digests)
+
+
+def contains_forbidden(
+    text: str,
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+) -> bool:
+    return contains_forbidden_window(text, forbidden_digests, window_size) or contains_forbidden_compact(
+        text,
+        forbidden_compact_digests,
+        compact_window_size,
+    )
+
+
+def scan_files(
+    root: Path,
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+) -> list[Path]:
     candidates = sorted(
         {path.resolve() for path in [*tracked_files(root), *walked_files(root)]},
         key=lambda path: str(path),
@@ -91,13 +133,20 @@ def scan_files(root: Path, forbidden_digests: set[str], window_size: int) -> lis
         if not path.is_file():
             continue
         try:
+            relative_path = str(path.relative_to(root))
+        except ValueError:
+            relative_path = str(path)
+        if contains_forbidden(relative_path, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
+            offenders.append(path)
+            continue
+        try:
             data = path.read_bytes()
         except OSError:
             continue
         text = decode_text(data)
         if text is None:
             continue
-        if contains_forbidden_window(text, forbidden_digests, window_size):
+        if contains_forbidden(text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
             offenders.append(path)
     return offenders
 
@@ -115,22 +164,31 @@ def git_output(repo: Path, args: list[str]) -> bytes:
     return result.stdout
 
 
-def scan_history(repo: Path, forbidden_digests: set[str], window_size: int) -> bool:
+def scan_history(
+    repo: Path,
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+) -> bool:
     if not (repo / ".git").exists():
         return False
     log_text = decode_text(git_output(repo, ["log", "--all", "--format=%B"]))
-    if log_text and contains_forbidden_window(log_text, forbidden_digests, window_size):
+    if log_text and contains_forbidden(log_text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
         return True
     commits = [line.decode("ascii") for line in git_output(repo, ["rev-list", "--all"]).splitlines() if line]
     for commit in commits:
         entries = [entry for entry in git_output(repo, ["ls-tree", "-rz", commit]).split(b"\0") if entry]
         for entry in entries:
-            metadata, _, _path = entry.partition(b"\t")
+            metadata, _, path_bytes = entry.partition(b"\t")
             parts = metadata.split()
             if len(parts) < 3 or parts[1] != b"blob":
                 continue
+            path_text = decode_text(path_bytes)
+            if path_text and contains_forbidden(path_text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
+                return True
             text = decode_text(git_output(repo, ["cat-file", "-p", parts[2].decode("ascii")]))
-            if text and contains_forbidden_window(text, forbidden_digests, window_size):
+            if text and contains_forbidden(text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
                 return True
     return False
 
@@ -147,16 +205,25 @@ def main() -> None:
     parser.add_argument("--history", action="store_true", help="also scan git commit messages and tracked text blobs")
     parser.add_argument("--digest", action="append", type=digest_arg, default=[], help=argparse.SUPPRESS)
     parser.add_argument("--window-size", type=int, default=DEFAULT_WINDOW_SIZE, help=argparse.SUPPRESS)
+    parser.add_argument("--compact-digest", action="append", type=digest_arg, default=[], help=argparse.SUPPRESS)
+    parser.add_argument("--compact-window-size", type=int, default=DEFAULT_COMPACT_WINDOW_SIZE, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    if args.window_size < 1:
+    if args.window_size < 1 or args.compact_window_size < 1:
         fail("invalid guard configuration")
     root = Path(args.root).resolve()
     forbidden_digests = set(DEFAULT_FORBIDDEN_DIGESTS) | set(args.digest)
-    offenders = scan_files(root, forbidden_digests, args.window_size)
+    forbidden_compact_digests = set(DEFAULT_FORBIDDEN_COMPACT_DIGESTS) | set(args.compact_digest)
+    offenders = scan_files(root, forbidden_digests, args.window_size, forbidden_compact_digests, args.compact_window_size)
     if offenders:
         fail("internal brand rationale found in public text")
-    if args.history and scan_history(root, forbidden_digests, args.window_size):
+    if args.history and scan_history(
+        root,
+        forbidden_digests,
+        args.window_size,
+        forbidden_compact_digests,
+        args.compact_window_size,
+    ):
         fail("internal brand rationale found in repository history")
     print("PASS: public text guard")
 

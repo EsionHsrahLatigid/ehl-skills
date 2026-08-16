@@ -10,6 +10,14 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "develop-ehl-plugins" / "scripts" / "check_public_text.py"
 SYNTHETIC_PHRASE = "crimson lunar anvil"
 SYNTHETIC_DIGEST = hashlib.sha256(SYNTHETIC_PHRASE.encode("utf-8")).hexdigest()
+SYNTHETIC_COMPACT = "".join(SYNTHETIC_PHRASE.split())
+SYNTHETIC_COMPACT_DIGEST = hashlib.sha256(SYNTHETIC_COMPACT.encode("utf-8")).hexdigest()
+SYNTHETIC_COMPACT_ARGS = (
+    "--compact-digest",
+    SYNTHETIC_COMPACT_DIGEST,
+    "--compact-window-size",
+    str(len(SYNTHETIC_COMPACT)),
+)
 
 
 def run_guard(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -113,6 +121,53 @@ class PublicTextGuardTests(unittest.TestCase):
             result = run_guard(root, "--digest", SYNTHETIC_DIGEST)
 
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_rejects_synthetic_camel_case_compact_variant(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text("CrimsonLunarAnvil\n", encoding="utf-8")
+
+            result = run_guard(root, *SYNTHETIC_COMPACT_ARGS)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public text", result.stderr)
+        self.assertNotIn("CrimsonLunarAnvil", result.stderr)
+
+    def test_rejects_synthetic_lowercase_concatenation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(SYNTHETIC_COMPACT, encoding="utf-8")
+
+            result = run_guard(root, *SYNTHETIC_COMPACT_ARGS)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public text", result.stderr)
+        self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
+
+    def test_rejects_synthetic_embedded_identifier(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Processor.cpp").write_text(
+                f"auto prefix{SYNTHETIC_COMPACT}Suffix = 0;\n",
+                encoding="utf-8",
+            )
+
+            result = run_guard(root, *SYNTHETIC_COMPACT_ARGS)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public text", result.stderr)
+        self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
+
+    def test_rejects_synthetic_filename_variant(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / f"{SYNTHETIC_COMPACT}.txt").write_text("clean content\n", encoding="utf-8")
+
+            result = run_guard(root, *SYNTHETIC_COMPACT_ARGS)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public text", result.stderr)
+        self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
 
 
 if __name__ == "__main__":
