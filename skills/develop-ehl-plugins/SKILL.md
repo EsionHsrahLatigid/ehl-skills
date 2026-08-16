@@ -1,0 +1,52 @@
+---
+name: develop-ehl-plugins
+description: Build, test, review, package, and release EsionHsrahLatigid audio plugins across JUCE and YUP. Use when Codex works on EHL plugin repositories, DSP behavior, JUCE CMake projects, YUP CMake presets, plugin identity, realtime audio safety, deterministic DSP tests, EHL visual integration, CI artifacts, release ZIPs, GitHub organization publication, or final website/catalog update gates.
+---
+
+# Develop EHL Plugins
+
+Develop EsionHsrahLatigid plugins with evidence-first research, framework-specific build paths, hard realtime safety, deterministic tests, audibility checks, EHL design conformance, and verified release artifacts.
+
+## Start
+
+1. Read repository guidance, README, build presets, workflows, and existing tests before editing.
+2. Identify framework:
+   - JUCE: `juce_add_plugin`, JUCE modules, Projucer or CMake plugin targets.
+   - YUP: evidenced `yup_audio_plugin`, `CMakePresets.json`, `engine-debug`, `plugin-release`, or `ehl_stage_products`.
+3. Before DSP or release decisions, inspect official or primary sources for the framework/API/library behavior being changed. Use local vendored docs when present; otherwise use upstream documentation or source. Record the source path, URL, version, or commit in the task evidence.
+4. For EHL design, discover project-local design rules first, then sibling EHL evidence repositories when present, installed `ehl-design` references, and the target design module or submodule state. Treat the public identity as `EsionHsrahLatigid`; never expose internal brand rationale in public copy, metadata, UI, repository text, artifacts, or messages.
+5. For durable work, capture evidence in Obsidian through the configured Obsidian workflow when available: source facts, test commands, artifact paths, CI run links, decisions, and unresolved risks. Do not store secrets or private rationale.
+
+## Route By Framework
+
+- JUCE project work: read [references/juce.md](references/juce.md).
+- YUP project work: read [references/yup.md](references/yup.md).
+- DSP, realtime callback, or test behavior: read [references/dsp-realtime-tests.md](references/dsp-realtime-tests.md).
+- Identity, shared logo modules, UI, or public-facing copy: read [references/ehl-identity-design.md](references/ehl-identity-design.md).
+- CI, release ZIPs, latest artifacts, or website/catalog updates: read [references/ci-release.md](references/ci-release.md).
+
+Read only the references needed for the active task, but always combine identity/design with release work because public surfaces are involved.
+
+## Non-Negotiable Gates
+
+- Keep plugin identity stable after release: manufacturer `EsionHsrahLatigid`, manufacturer code `EHL_`, bundle IDs under `jp.ehl.`, GitHub owner `EsionHsrahLatigid`, and unique four-character plugin codes where the framework requires them.
+- Keep the audio callback allocation-free and bounded; no locks, file/network I/O, logging, exceptions, unbounded loops, or UI ownership on the realtime path.
+- Add deterministic tests for changed DSP behavior before broad packaging claims.
+- For aggressive distortion, corruption, noise, or glitch effects, prove the output remains intentionally audible at useful settings and extremes. Prevent failures that collapse into perceived silence, DC rails, clipped constants, NaN/Inf, denormal stalls, ultrasonic-only energy, or host-dangerous output.
+- Preserve EHL design module boundaries: production JUCE code uses `juce-ehl-design-module`; production YUP code uses `yup-ehl-design-module`. Do not copy local logo paths into consumer plugins.
+- Resolve the bundled guard relative to the loaded `SKILL.md` directory and run `python3 <skill-dir>/scripts/check_public_text.py --history <consumer-repo>` before public commits, releases, or website updates.
+- Make small commits with English subjects and detailed bodies. Do not include private rationale in commit messages.
+- After plugin publication, update the public web/catalog only after artifact verification, public copy verification, and the website verifier pass.
+
+## Verification
+
+Report the concrete evidence that matches the change:
+
+- primary sources consulted;
+- files changed;
+- test commands and pass/fail output;
+- build/typecheck/plugin validation commands;
+- artifact paths, checksums, code signatures, and installed copy paths where applicable;
+- public-text guard result;
+- CI run URLs, release URLs, and latest ZIP names when publishing;
+- Obsidian note path or reason it was unavailable.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Develop EHL Plugins"
+  short_description: "Build JUCE and YUP EHL plugins"
+  default_prompt: "Use $develop-ehl-plugins to build, test, and release an EsionHsrahLatigid audio plugin."
