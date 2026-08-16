@@ -7,7 +7,10 @@ import unittest
 import hashlib
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "develop-ehl-plugins" / "scripts" / "check_public_text.py"
+SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "develop-ehl-plugins"
+SCRIPT = SKILL_DIR / "scripts" / "check_public_text.py"
+SKILL_MD = SKILL_DIR / "SKILL.md"
+IDENTITY_REFERENCE = SKILL_DIR / "references" / "ehl-identity-design.md"
 SYNTHETIC_PHRASE = "crimson lunar anvil"
 SYNTHETIC_DIGEST = hashlib.sha256(SYNTHETIC_PHRASE.encode("utf-8")).hexdigest()
 SYNTHETIC_COMPACT = "".join(SYNTHETIC_PHRASE.split())
@@ -168,6 +171,25 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("public text", result.stderr)
         self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
+
+    def test_skill_requires_workspace_level_ehl_evidence_tree(self) -> None:
+        text = SKILL_MD.read_text(encoding="utf-8")
+
+        self.assertIn("workspace-level EHL evidence tree", text)
+        self.assertIn("/Users/2bit/prog/ehl", text)
+        self.assertIn("Do not resolve the evidence tree relative to a target plugin repository", text)
+        self.assertIn("session, log, timeline, handover, memo, or decision", text)
+        self.assertIn("nested git repositories", text)
+        self.assertIn("public-copy verifier scripts", text)
+
+    def test_identity_reference_has_no_ambiguous_target_relative_ehl_path(self) -> None:
+        text = IDENTITY_REFERENCE.read_text(encoding="utf-8")
+        ambiguous_path = "../" + "ehl"
+
+        self.assertNotIn(f"`{ambiguous_path}`", text)
+        self.assertIn("workspace-level EHL evidence tree", text)
+        self.assertIn("Locate that tree from the workspace root rather than from a target plugin repository", text)
+        self.assertIn("release notes, repository metadata, public source, website/catalog text", text)
 
 
 if __name__ == "__main__":

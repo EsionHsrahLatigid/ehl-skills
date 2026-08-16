@@ -5,18 +5,17 @@ Use this reference for metadata, UI, shared design modules, assets, README copy,
 ## Sources
 
 - Discover project-local design rules first: `design_rules/DESIGN_RULES.md`, `.agents`, `.codex`, repository README files, and checked-in design docs near the active plugin.
-- When working in a local workspace with a sibling EHL evidence repository, especially `../ehl` when present, it may contain design rules, the public web verifier, session evidence, and git history. Treat sibling paths as local examples only; do not bake them into public guidance, generated code, CI, or reusable commands.
-- When a sibling EHL evidence repository exists, explicitly check relevant `**/*session*`, `**/*log*`, `**/*handover*`, `**/*memo*`, and `**/*decision*` files before changing public identity or release guidance. Record either the files consulted or that no matching durable session evidence exists. If there are no normal session-log files, treat git logs, relevant commits, and verifier history as durable session evidence.
+- When working in a local workspace with a workspace-level EHL evidence tree that is a sibling of the active workspace root, it may contain design rules, the public web verifier, session evidence, and git history. Locate that tree from the workspace root rather than from a target plugin repository; in this workspace it is `/Users/2bit/prog/ehl`. Treat sibling paths as local examples only; do not bake them into public guidance, generated code, CI, or reusable commands.
+- When the workspace-level EHL evidence tree exists, explicitly check relevant `**/*session*`, `**/*log*`, `**/*timeline*`, `**/*handover*`, `**/*memo*`, and `**/*decision*` files before changing public identity or release guidance. Record the files consulted or that no matching ordinary durable evidence exists. If there are no ordinary durable evidence files, inspect nested git repositories under the tree, including recent logs, relevant public-copy commits, and verifier history, and record what was consulted.
 - When installed, read the `ehl-design` skill and only the relevant bundled references for brand, logo, output profile, Canva, or plugin UI work.
 - Read the target repository's design module, submodule, or pinned dependency state.
 - If an EHL web repository is available, treat its verifier and the commit that removed internal rationale from public copy as durable evidence that internal brand rationale must be absent from public surfaces.
-- If normal session-log files exist in the discovered EHL evidence locations, read them before changing public EHL guidance. If none exist, treat git logs, relevant commits, and verifier history as durable session evidence.
 
 ## Public Identity
 
 - Public brand: `EsionHsrahLatigid`.
 - Public copy may describe the work as experimental, digital, harsh, noisy, technical, underground, precise, and audio-tool oriented.
-- Do not expose, translate, explain, or quote internal source rationale in public-facing surfaces or commit messages. Never surface the private descriptor on public-facing surfaces.
+- Do not expose, translate, explain, or quote internal source rationale in public-facing surfaces, release notes, repository metadata, public source, website/catalog text, commit messages, or commit history. Never surface the private descriptor on public-facing surfaces.
 - Resolve the bundled guard from the loaded `SKILL.md` directory and run `python3 <skill-dir>/scripts/check_public_text.py --history <consumer-repo>` before publishing or updating public copy.
 
 ## Plugin UI
