@@ -14,7 +14,7 @@ Develop EsionHsrahLatigid plugins with evidence-first research, framework-specif
    - JUCE: `juce_add_plugin`, JUCE modules, Projucer or CMake plugin targets.
    - YUP: evidenced `yup_audio_plugin`, `CMakePresets.json`, `engine-debug`, `plugin-release`, or `ehl_stage_products`.
 3. Before DSP or release decisions, inspect official or primary sources for the framework/API/library behavior being changed. Use local vendored docs when present; otherwise use upstream documentation or source. Record the source path, URL, version, or commit in the task evidence.
-4. For EHL design, discover project-local design rules first, then sibling EHL evidence repositories when present, installed `ehl-design` references, and the target design module or submodule state. Treat the public identity as `EsionHsrahLatigid`; never expose internal brand rationale in public copy, metadata, UI, repository text, artifacts, or messages.
+4. For EHL design, discover project-local design rules first, then sibling EHL evidence repositories when present, especially `../ehl` if it exists, installed `ehl-design` references, and the target design module or submodule state. Treat the public identity as `EsionHsrahLatigid`; never expose the private descriptor or internal brand rationale in public copy, metadata, UI, repository text, artifacts, or messages. If a sibling evidence repository exists, check its session logs, timelines, handover notes, memos, and decisions before changing public-facing guidance.
 5. For durable work, capture evidence in Obsidian through the configured Obsidian workflow when available: source facts, test commands, artifact paths, CI run links, decisions, and unresolved risks. Do not store secrets or private rationale.
 
 ## Route By Framework
