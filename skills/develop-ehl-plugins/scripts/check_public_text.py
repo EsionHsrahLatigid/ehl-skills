@@ -32,6 +32,14 @@ DEFAULT_FORBIDDEN_COMPACT_DIGESTS = frozenset(
         "df72b45f82869a738a4b6548b7860129cd368209ac73577210765c4b929b17ee",
     }
 )
+DEFAULT_INTERNAL_TOKEN_DIGESTS = frozenset(
+    {
+        "338fd9894b114dba6235ea4f939c51c7bb7038dd4f79f4c9985c26ae5217e64d",
+        "4888ae60e130799ef640565aa8aa6eb87eb4f96031e37db5af52a11ab495380b",
+        "a2374cbb852d23661bc798d061e033606a66cda16a16cd31defc38fa5670f864",
+        "68b5100223908763dfb6b9e39ed35d8456a840b337df0244782a9565fb4cdeff",
+    }
+)
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 ALNUM_RE = re.compile(r"[a-z0-9]")
 REGEX_QUANTIFIER_RE = r"(?:[+*?]|\{\d+(?:,\d*)?\})?"
@@ -108,6 +116,13 @@ def contains_forbidden_window(text: str, forbidden_digests: set[str], window_siz
     return bool(token_window_digests(text, window_size) & forbidden_digests)
 
 
+def contains_internal_identifier(text: str) -> bool:
+    return any(
+        hashlib.sha256(token.encode("utf-8")).hexdigest() in DEFAULT_INTERNAL_TOKEN_DIGESTS
+        for token in TOKEN_RE.findall(text.casefold())
+    )
+
+
 def compact_window_digests(text: str, window_size: int) -> set[str]:
     compact = "".join(ALNUM_RE.findall(text.casefold()))
     if len(compact) < window_size:
@@ -137,10 +152,10 @@ def contains_forbidden(
     forbidden_compact_digests: set[str],
     compact_window_size: int,
 ) -> bool:
-    return contains_forbidden_window(text, forbidden_digests, window_size) or contains_forbidden_compact(
-        text,
-        forbidden_compact_digests,
-        compact_window_size,
+    return (
+        contains_forbidden_window(text, forbidden_digests, window_size)
+        or contains_forbidden_compact(text, forbidden_compact_digests, compact_window_size)
+        or contains_internal_identifier(text)
     )
 
 

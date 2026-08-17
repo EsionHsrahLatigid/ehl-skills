@@ -125,6 +125,23 @@ class PublicTextGuardTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_rejects_internal_program_identifiers_without_plaintext_fixture(self) -> None:
+        identifiers = (
+            bytes((100, 104, 110)).decode("ascii"),
+            bytes((100, 104, 110, 57)).decode("ascii"),
+            bytes((103, 48, 48, 49)).decode("ascii"),
+            bytes((103, 48, 48, 50)).decode("ascii"),
+        )
+        for identifier in identifiers:
+            with self.subTest(identifier_length=len(identifier)), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "README.md").write_text(f"internal plan {identifier}\n", encoding="utf-8")
+
+                result = run_guard(root)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn(identifier, result.stderr)
+
     def test_rejects_synthetic_camel_case_compact_variant(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -238,6 +255,7 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("public-copy verifier scripts", text)
         self.assertIn("regex, escaped, split, compact, camel-case, embedded, or filename spelling", text)
         self.assertIn("encoded whitespace", text)
+        self.assertIn("known internal planning identifiers", text)
 
     def test_identity_reference_has_no_ambiguous_target_relative_ehl_path(self) -> None:
         text = IDENTITY_REFERENCE.read_text(encoding="utf-8")
