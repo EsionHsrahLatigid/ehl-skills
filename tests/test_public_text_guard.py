@@ -404,6 +404,12 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("git bundle verify", remediation_text)
         self.assertIn("pre- and post-rewrite default-branch tree IDs", remediation_text)
         self.assertIn("GitHub releases are based on Git tags", remediation_text)
+        self.assertIn("`refs/backup/*`", remediation_text)
+        self.assertIn("`git push --mirror` publishes every local ref", remediation_text)
+        self.assertIn("require exact equality with the intended push surface", remediation_text)
+        self.assertIn("Never use a writable recovery repository as `origin`", remediation_text)
+        self.assertIn("`git push --dry-run --mirror origin`", remediation_text)
+        self.assertIn("fail closed", remediation_text)
         self.assertIn("Require collaborators to reclone", remediation_text)
         self.assertIn("never place sensitive plaintext there", remediation_text)
 

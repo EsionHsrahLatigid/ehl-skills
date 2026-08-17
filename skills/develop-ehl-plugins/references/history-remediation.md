@@ -24,6 +24,7 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
 4. Store the bundle in a mode `0700` directory with mode `0600`, verify it with `git bundle verify`, and record its SHA-256.
 5. Record pre-rewrite heads, tags, release targets, open pull requests, forks, LFS use, submodules, branch protections, and rulesets.
 6. Mark the bundle and manifest `DO NOT PUBLISH`. They intentionally retain the old history.
+7. Enumerate every ref namespace in the bundle. Recovery bundles may legitimately retain `refs/backup/*`, `refs/remotes/*`, or other private refs, but those refs are never part of the publication surface.
 
 ## Isolated rewrite
 
@@ -35,23 +36,27 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
    - Replace commit or tag messages with `--replace-message` or a message callback.
    - Use callbacks only when path or encoding variants cannot be handled safely by the simpler operations.
 4. Capture `.git/filter-repo/commit-map`, `changed-refs`, first-changed commits, and any orphaned-LFS report.
-5. Do not add recovery refs or backup branches to the rewritten repository.
+5. Do not add recovery refs or backup branches to the rewritten repository. A mirror clone made from a recovery bundle may import non-public refs even when local branch inspection looked clean.
 
 ## Local verification before publication
 
 - Run the bundled public-text guard with `--history` against the isolated rewritten clone.
 - Compare the pre- and post-rewrite default-branch tree IDs. They must remain identical when the current public tree was already clean.
 - Verify every branch and tag expected by the preflight manifest, and confirm no unexpected refs were created.
+- Define the intended push surface as the exact public `refs/heads/*` and `refs/tags/*` set. Before adding a public remote, remove `refs/backup/*`, `refs/remotes/*`, `refs/original/*`, recovery refs, and every other non-public namespace from the isolated publication clone.
+- Remember that `git push --mirror` publishes every local ref, not just branches and tags. Enumerate all remaining refs and require exact equality with the intended push surface.
+- Keep the rewrite clone's `origin` absent or pointed only at a non-pushable, read-only bundle URL until publication is explicitly authorized. Never use a writable recovery repository as `origin`; an accidental mirror push could damage the recovery source. The absent or non-pushable configuration makes accidental publication fail closed.
 - Re-run project-specific tests and metadata checks when the rewrite changes the current tree. A history-only rewrite does not waive release verification.
 - Review release tags because GitHub releases are based on Git tags. A moved tag changes the repository snapshot associated with that release.
 
 ## Authorized publication
 
 1. Reconfirm the repository write freeze and remote heads immediately before pushing.
-2. Force-push the rewritten mirror only after exact-target authorization. Expect forge-managed `refs/pull/*` to reject updates because GitHub marks them read-only.
-3. Change branch protection only when a verified non-PR ref is rejected, and restore it immediately afterward.
-4. Delete only the release assets and workflow artifacts whose exact IDs failed verification. Preserve safe platform siblings.
-5. Never upload the recovery bundle, replacement specification, old-to-new commit map, or private audit material.
+2. Add or replace `origin` with the exact authorized public repository only after the local ref-set checks pass. Review `git push --dry-run --mirror origin` and reject any ref creation, deletion, or update outside the approved heads and tags.
+3. Force-push the rewritten mirror only after exact-target authorization. Expect forge-managed `refs/pull/*` to reject updates because GitHub marks them read-only.
+4. Change branch protection only when a verified non-PR ref is rejected, and restore it immediately afterward.
+5. Delete only the release assets and workflow artifacts whose exact IDs failed verification. Preserve safe platform siblings.
+6. Never upload the recovery bundle, replacement specification, old-to-new commit map, or private audit material.
 
 ## Server and collaborator cleanup
 
