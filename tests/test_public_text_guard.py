@@ -11,6 +11,7 @@ SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "develop-ehl-plugin
 SCRIPT = SKILL_DIR / "scripts" / "check_public_text.py"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 IDENTITY_REFERENCE = SKILL_DIR / "references" / "ehl-identity-design.md"
+HISTORY_REMEDIATION_REFERENCE = SKILL_DIR / "references" / "history-remediation.md"
 SYNTHETIC_PHRASE = "crimson lunar anvil"
 SYNTHETIC_DIGEST = hashlib.sha256(SYNTHETIC_PHRASE.encode("utf-8")).hexdigest()
 SYNTHETIC_COMPACT = "".join(SYNTHETIC_PHRASE.split())
@@ -278,6 +279,21 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("Locate that tree from the workspace root rather than from a target plugin repository", text)
         self.assertIn("Do not treat incidental substrings such as `logo` as log evidence", text)
         self.assertIn("release notes, repository metadata, public source, website/catalog text", text)
+
+    def test_skill_routes_guard_failures_to_safe_history_remediation(self) -> None:
+        skill_text = SKILL_MD.read_text(encoding="utf-8")
+        remediation_text = HISTORY_REMEDIATION_REFERENCE.read_text(encoding="utf-8")
+
+        self.assertIn("references/history-remediation.md", skill_text)
+        self.assertIn("If the history guard fails, stop publication", skill_text)
+        self.assertIn("explicit authorization for the exact targets", skill_text)
+        self.assertIn("git-filter-repo` 2.47 or newer", remediation_text)
+        self.assertIn("fresh clone", remediation_text)
+        self.assertIn("git bundle verify", remediation_text)
+        self.assertIn("pre- and post-rewrite default-branch tree IDs", remediation_text)
+        self.assertIn("GitHub releases are based on Git tags", remediation_text)
+        self.assertIn("Require collaborators to reclone", remediation_text)
+        self.assertIn("never place sensitive plaintext there", remediation_text)
 
 
 if __name__ == "__main__":

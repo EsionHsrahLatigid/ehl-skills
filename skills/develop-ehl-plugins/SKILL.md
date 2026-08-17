@@ -26,6 +26,7 @@ Develop EsionHsrahLatigid plugins with evidence-first research, framework-specif
 - DSP, realtime callback, or test behavior: read [references/dsp-realtime-tests.md](references/dsp-realtime-tests.md).
 - Identity, shared logo modules, UI, or public-facing copy: read [references/ehl-identity-design.md](references/ehl-identity-design.md).
 - CI, release ZIPs, latest artifacts, or website/catalog updates: read [references/ci-release.md](references/ci-release.md).
+- Published history, cached refs, or stale artifact remediation: read [references/history-remediation.md](references/history-remediation.md).
 
 Read only the references needed for the active task, but always combine identity/design with release work because public surfaces are involved.
 
@@ -37,6 +38,7 @@ Read only the references needed for the active task, but always combine identity
 - For aggressive distortion, corruption, noise, or glitch effects, prove the output remains intentionally audible at useful settings and extremes. Prevent failures that collapse into perceived silence, DC rails, clipped constants, NaN/Inf, denormal stalls, ultrasonic-only energy, or host-dangerous output.
 - Preserve EHL design module boundaries: production JUCE code uses `juce-ehl-design-module`; production YUP code uses `yup-ehl-design-module`. Do not copy local logo paths into consumer plugins.
 - Resolve the bundled guard relative to the loaded `SKILL.md` directory and run `python3 <skill-dir>/scripts/check_public_text.py --history <consumer-repo>` before public commits, releases, website updates, or other public-surface changes.
+- If the history guard fails, stop publication, preserve a private verified recovery bundle, and follow the history-remediation reference. Never rewrite refs, force-push, delete releases, or delete workflow artifacts without explicit authorization for the exact targets.
 - Make small commits with English subjects and detailed bodies. Do not include private rationale in commit messages.
 - After plugin publication, update the public web/catalog only after artifact verification, public copy verification, and the website verifier pass.
 
