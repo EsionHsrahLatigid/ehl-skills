@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import subprocess
 import sys
 import tempfile
 import unittest
-import hashlib
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parents[1] / "skills" / "develop-ehl-plugins"
@@ -58,6 +59,55 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("FAIL", result.stderr)
         self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
 
+    def test_json_report_redacts_current_match_and_keeps_safe_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(SYNTHETIC_PHRASE, encoding="utf-8")
+
+            result = run_guard(root, "--report-json", "--digest", SYNTHETIC_DIGEST)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["result"], "fail")
+        self.assertEqual(report["current"][0]["kind"], "current_content")
+        self.assertEqual(report["current"][0]["path"], "README.md")
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stdout)
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
+
+    def test_json_report_redacts_forbidden_current_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            forbidden_path = root / f"{SYNTHETIC_PHRASE}.md"
+            forbidden_path.write_text("clean public text\n", encoding="utf-8")
+
+            result = run_guard(root, "--report-json", "--digest", SYNTHETIC_DIGEST)
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["current"][0]["kind"], "current_path")
+        self.assertNotIn("path", report["current"][0])
+        self.assertRegex(report["current"][0]["path_sha256"], r"^[0-9a-f]{64}$")
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stdout)
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
+
+    def test_json_report_pass_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text("clean public text\n", encoding="utf-8")
+
+            result = run_guard(root, "--report-json", "--digest", SYNTHETIC_DIGEST)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "schema": "ehl-public-text-report-v1",
+                "result": "pass",
+                "current": [],
+                "history": [],
+            },
+        )
+
     def test_rejects_cpp_text_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -98,6 +148,68 @@ class PublicTextGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("repository history", result.stderr)
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
+
+    def test_json_report_identifies_history_message_and_blob_without_match_text(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+            (root / "README.md").write_text(SYNTHETIC_PHRASE, encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", SYNTHETIC_PHRASE], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            (root / "README.md").write_text("clean current text\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "Clean current text"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+
+            result = run_guard(
+                root,
+                "--history",
+                "--report-json",
+                "--digest",
+                SYNTHETIC_DIGEST,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertEqual({finding["kind"] for finding in report["history"]}, {"history_message", "history_blob"})
+        blob_finding = next(finding for finding in report["history"] if finding["kind"] == "history_blob")
+        self.assertEqual(blob_finding["path"], "README.md")
+        self.assertRegex(blob_finding["commit"], r"^[0-9a-f]{40}$")
+        self.assertRegex(blob_finding["blob"], r"^[0-9a-f]{40}$")
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stdout)
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
+
+    def test_json_report_redacts_forbidden_history_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+            forbidden_name = f"{SYNTHETIC_PHRASE}.md"
+            (root / forbidden_name).write_text("clean public text\n", encoding="utf-8")
+            subprocess.run(["git", "add", forbidden_name], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "Add historical file"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+            (root / forbidden_name).unlink()
+            (root / "README.md").write_text("clean current text\n", encoding="utf-8")
+            subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-m", "Remove historical file"], cwd=root, check=True, stdout=subprocess.DEVNULL)
+
+            result = run_guard(
+                root,
+                "--history",
+                "--report-json",
+                "--digest",
+                SYNTHETIC_DIGEST,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        path_finding = next(finding for finding in report["history"] if finding["kind"] == "history_path")
+        self.assertNotIn("path", path_finding)
+        self.assertRegex(path_finding["path_sha256"], r"^[0-9a-f]{64}$")
+        self.assertNotIn(SYNTHETIC_PHRASE, result.stdout)
         self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
 
     def test_rejects_untracked_public_file_in_git_repo(self) -> None:

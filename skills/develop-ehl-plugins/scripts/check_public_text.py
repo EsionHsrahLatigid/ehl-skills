@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -236,6 +237,157 @@ def scan_history(
     return False
 
 
+def safe_path_finding(
+    kind: str,
+    path_text: str,
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+    **metadata: str,
+) -> dict[str, str]:
+    finding = {
+        "kind": kind,
+        "path_sha256": hashlib.sha256(path_text.encode("utf-8")).hexdigest(),
+        **metadata,
+    }
+    if not contains_forbidden(
+        path_text,
+        forbidden_digests,
+        window_size,
+        forbidden_compact_digests,
+        compact_window_size,
+    ):
+        finding["path"] = path_text
+    return finding
+
+
+def report_current_findings(
+    root: Path,
+    offenders: list[Path],
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+    for path in offenders:
+        try:
+            path_text = str(path.relative_to(root))
+        except ValueError:
+            path_text = str(path)
+        path_is_forbidden = contains_forbidden(
+            path_text,
+            forbidden_digests,
+            window_size,
+            forbidden_compact_digests,
+            compact_window_size,
+        )
+        findings.append(
+            safe_path_finding(
+                "current_path" if path_is_forbidden else "current_content",
+                path_text,
+                forbidden_digests,
+                window_size,
+                forbidden_compact_digests,
+                compact_window_size,
+            )
+        )
+    return findings
+
+
+def report_history_findings(
+    repo: Path,
+    forbidden_digests: set[str],
+    window_size: int,
+    forbidden_compact_digests: set[str],
+    compact_window_size: int,
+) -> list[dict[str, str]]:
+    if not (repo / ".git").exists():
+        return []
+    findings: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    blob_matches: dict[str, bool] = {}
+    commits = [line.decode("ascii") for line in git_output(repo, ["rev-list", "--all"]).splitlines() if line]
+    for commit in commits:
+        message = decode_text(git_output(repo, ["show", "-s", "--format=%B", commit]))
+        if message and contains_forbidden(
+            message,
+            forbidden_digests,
+            window_size,
+            forbidden_compact_digests,
+            compact_window_size,
+        ):
+            findings.append({"kind": "history_message", "commit": commit})
+        entries = [entry for entry in git_output(repo, ["ls-tree", "-rz", commit]).split(b"\0") if entry]
+        for entry in entries:
+            metadata, _, path_bytes = entry.partition(b"\t")
+            parts = metadata.split()
+            if len(parts) < 3 or parts[1] != b"blob":
+                continue
+            blob = parts[2].decode("ascii")
+            path_text = decode_text(path_bytes)
+            if path_text and contains_forbidden(
+                path_text,
+                forbidden_digests,
+                window_size,
+                forbidden_compact_digests,
+                compact_window_size,
+            ):
+                key = ("history_path", hashlib.sha256(path_text.encode("utf-8")).hexdigest())
+                if key not in seen:
+                    seen.add(key)
+                    findings.append(
+                        safe_path_finding(
+                            "history_path",
+                            path_text,
+                            forbidden_digests,
+                            window_size,
+                            forbidden_compact_digests,
+                            compact_window_size,
+                            commit=commit,
+                            blob=blob,
+                        )
+                    )
+            if blob not in blob_matches:
+                text = decode_text(git_output(repo, ["cat-file", "-p", blob]))
+                blob_matches[blob] = bool(
+                    text
+                    and contains_forbidden(
+                        text,
+                        forbidden_digests,
+                        window_size,
+                        forbidden_compact_digests,
+                        compact_window_size,
+                    )
+                )
+            if blob_matches[blob]:
+                key = ("history_blob", blob)
+                if key not in seen:
+                    seen.add(key)
+                    findings.append(
+                        safe_path_finding(
+                            "history_blob",
+                            path_text or "",
+                            forbidden_digests,
+                            window_size,
+                            forbidden_compact_digests,
+                            compact_window_size,
+                            commit=commit,
+                            blob=blob,
+                        )
+                    )
+    return sorted(
+        findings,
+        key=lambda finding: (
+            finding["kind"],
+            finding.get("commit", ""),
+            finding.get("path_sha256", ""),
+            finding.get("blob", ""),
+        ),
+    )
+
+
 def digest_arg(value: str) -> str:
     if not re.fullmatch(r"[0-9a-f]{64}", value):
         raise argparse.ArgumentTypeError("digest must be 64 lowercase hex characters")
@@ -250,6 +402,11 @@ def main() -> None:
     parser.add_argument("--window-size", type=int, default=DEFAULT_WINDOW_SIZE, help=argparse.SUPPRESS)
     parser.add_argument("--compact-digest", action="append", type=digest_arg, default=[], help=argparse.SUPPRESS)
     parser.add_argument("--compact-window-size", type=int, default=DEFAULT_COMPACT_WINDOW_SIZE, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--report-json",
+        action="store_true",
+        help="emit redacted offender metadata without printing matched text",
+    )
     args = parser.parse_args()
 
     if args.window_size < 1 or args.compact_window_size < 1:
@@ -258,17 +415,43 @@ def main() -> None:
     forbidden_digests = set(DEFAULT_FORBIDDEN_DIGESTS) | set(args.digest)
     forbidden_compact_digests = set(DEFAULT_FORBIDDEN_COMPACT_DIGESTS) | set(args.compact_digest)
     offenders = scan_files(root, forbidden_digests, args.window_size, forbidden_compact_digests, args.compact_window_size)
-    if offenders:
-        fail("internal brand rationale found in public text")
-    if args.history and scan_history(
+    history_findings: list[dict[str, str]] = []
+    if args.history and args.report_json:
+        history_findings = report_history_findings(
+            root,
+            forbidden_digests,
+            args.window_size,
+            forbidden_compact_digests,
+            args.compact_window_size,
+        )
+    history_failed = bool(history_findings) if args.report_json else args.history and scan_history(
         root,
         forbidden_digests,
         args.window_size,
         forbidden_compact_digests,
         args.compact_window_size,
-    ):
+    )
+    if args.report_json:
+        report = {
+            "schema": "ehl-public-text-report-v1",
+            "result": "fail" if offenders or history_failed else "pass",
+            "current": report_current_findings(
+                root,
+                offenders,
+                forbidden_digests,
+                args.window_size,
+                forbidden_compact_digests,
+                args.compact_window_size,
+            ),
+            "history": history_findings,
+        }
+        print(json.dumps(report, sort_keys=True, separators=(",", ":")))
+    if offenders:
+        fail("internal brand rationale found in public text")
+    if history_failed:
         fail("internal brand rationale found in repository history")
-    print("PASS: public text guard")
+    if not args.report_json:
+        print("PASS: public text guard")
 
 
 if __name__ == "__main__":
