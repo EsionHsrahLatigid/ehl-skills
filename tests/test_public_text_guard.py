@@ -125,6 +125,18 @@ class PublicTextGuardTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_skips_local_omx_runtime_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / ".omx" / "state"
+            runtime.mkdir(parents=True)
+            (runtime / "ledger.jsonl").write_text(SYNTHETIC_PHRASE, encoding="utf-8")
+            (root / "README.md").write_text("Public product copy\n", encoding="utf-8")
+
+            result = run_guard(root, "--digest", SYNTHETIC_DIGEST)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_rejects_internal_program_identifiers_without_plaintext_fixture(self) -> None:
         identifiers = (
             bytes((100, 104, 110)).decode("ascii"),

@@ -13,6 +13,7 @@ from pathlib import Path
 
 SKIP_DIRS = {
     ".git",
+    ".omx",
     ".pytest_cache",
     "__pycache__",
     "build",
