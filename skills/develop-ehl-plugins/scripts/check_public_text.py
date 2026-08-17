@@ -34,14 +34,25 @@ DEFAULT_FORBIDDEN_COMPACT_DIGESTS = frozenset(
 )
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 ALNUM_RE = re.compile(r"[a-z0-9]")
+REGEX_QUANTIFIER_RE = r"(?:[+*?]|\{\d+(?:,\d*)?\})?"
+WHITESPACE_ESCAPE_RE = (
+    r"\\{1,2}(?:[sbdwnrt]|x(?:09|0a|0d|20|a0)|u(?:0009|000a|000d|0020|00a0)"
+    r"|U(?:00000009|0000000a|0000000d|00000020|000000a0))"
+)
+PERCENT_WHITESPACE_RE = r"%(?:09|0a|0d|20|a0)"
+HTML_WHITESPACE_RE = r"&(?:nbsp|\#(?:0*9|0*10|0*13|0*32|0*160|x0*(?:9|a|d|20|a0)));"
 REGEX_SEPARATOR_RE = re.compile(
-    r"""
-    (?:\\{1,2}[sSbBdDwW](?:[+*?]|\{\d+(?:,\d*)?\})?)
-    |(?:\[(?:\\{1,2}[sSbBdDwW]|[^\]])+\](?:[+*?]|\{\d+(?:,\d*)?\})?)
-    |(?:\(\?[:=!<][^)]*\))
-    |(?:[\\|+*?^$()[\]{}.,;:_/\-]+)
-    """,
-    re.VERBOSE,
+    "|".join(
+        (
+            rf"(?:{WHITESPACE_ESCAPE_RE}{REGEX_QUANTIFIER_RE})",
+            rf"(?:{PERCENT_WHITESPACE_RE}{REGEX_QUANTIFIER_RE})",
+            rf"(?:{HTML_WHITESPACE_RE}{REGEX_QUANTIFIER_RE})",
+            rf"(?:\[(?:{WHITESPACE_ESCAPE_RE}|[^\]])+\]{REGEX_QUANTIFIER_RE})",
+            r"(?:\(\?[:=!<][^)]*\))",
+            r"(?:[\\|+*?^$()[\]{}.,;:_/\-]+)",
+        )
+    ),
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
