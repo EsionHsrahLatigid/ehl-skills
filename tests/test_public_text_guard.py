@@ -172,6 +172,17 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("public text", result.stderr)
         self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
 
+    def test_rejects_synthetic_regex_whitespace_split_variant(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(r"crimson\\s+lunar\\s+anvil", encoding="utf-8")
+
+            result = run_guard(root, *SYNTHETIC_COMPACT_ARGS)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("public text", result.stderr)
+        self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
+
     def test_skill_requires_workspace_level_ehl_evidence_tree(self) -> None:
         text = SKILL_MD.read_text(encoding="utf-8")
 
@@ -181,6 +192,7 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("session, log, timeline, handover, memo, or decision", text)
         self.assertIn("nested git repositories", text)
         self.assertIn("public-copy verifier scripts", text)
+        self.assertIn("regex, escaped, split, compact, camel-case, embedded, or filename spelling", text)
 
     def test_identity_reference_has_no_ambiguous_target_relative_ehl_path(self) -> None:
         text = IDENTITY_REFERENCE.read_text(encoding="utf-8")

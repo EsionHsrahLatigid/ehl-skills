@@ -34,6 +34,15 @@ DEFAULT_FORBIDDEN_COMPACT_DIGESTS = frozenset(
 )
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 ALNUM_RE = re.compile(r"[a-z0-9]")
+REGEX_SEPARATOR_RE = re.compile(
+    r"""
+    (?:\\{1,2}[sSbBdDwW](?:[+*?]|\{\d+(?:,\d*)?\})?)
+    |(?:\[(?:\\{1,2}[sSbBdDwW]|[^\]])+\](?:[+*?]|\{\d+(?:,\d*)?\})?)
+    |(?:\(\?[:=!<][^)]*\))
+    |(?:[\\|+*?^$()[\]{}.,;:_/\-]+)
+    """,
+    re.VERBOSE,
+)
 
 
 def fail(message: str = "public text guard failed") -> None:
@@ -99,8 +108,15 @@ def compact_window_digests(text: str, window_size: int) -> set[str]:
     return digests
 
 
+def reconstructable_text_variants(text: str) -> tuple[str, str]:
+    return (text, REGEX_SEPARATOR_RE.sub(" ", text))
+
+
 def contains_forbidden_compact(text: str, forbidden_digests: set[str], window_size: int) -> bool:
-    return bool(compact_window_digests(text, window_size) & forbidden_digests)
+    return any(
+        compact_window_digests(variant, window_size) & forbidden_digests
+        for variant in reconstructable_text_variants(text)
+    )
 
 
 def contains_forbidden(
