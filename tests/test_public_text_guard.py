@@ -231,6 +231,9 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("/Users/2bit/prog/ehl", text)
         self.assertIn("Do not resolve the evidence tree relative to a target plugin repository", text)
         self.assertIn("session, log, timeline, handover, memo, or decision", text)
+        self.assertIn("whole path tokens", text)
+        self.assertIn("a substring such as `logo` is not log evidence", text)
+        self.assertIn("design-asset trees", text)
         self.assertIn("nested git repositories", text)
         self.assertIn("public-copy verifier scripts", text)
         self.assertIn("regex, escaped, split, compact, camel-case, embedded, or filename spelling", text)
@@ -243,6 +246,7 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertNotIn(f"`{ambiguous_path}`", text)
         self.assertIn("workspace-level EHL evidence tree", text)
         self.assertIn("Locate that tree from the workspace root rather than from a target plugin repository", text)
+        self.assertIn("Do not treat incidental substrings such as `logo` as log evidence", text)
         self.assertIn("release notes, repository metadata, public source, website/catalog text", text)
 
 
