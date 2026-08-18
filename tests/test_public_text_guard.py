@@ -13,6 +13,7 @@ SCRIPT = SKILL_DIR / "scripts" / "check_public_text.py"
 SKILL_MD = SKILL_DIR / "SKILL.md"
 IDENTITY_REFERENCE = SKILL_DIR / "references" / "ehl-identity-design.md"
 HISTORY_REMEDIATION_REFERENCE = SKILL_DIR / "references" / "history-remediation.md"
+CI_RELEASE_REFERENCE = SKILL_DIR / "references" / "ci-release.md"
 SYNTHETIC_PHRASE = "crimson lunar anvil"
 SYNTHETIC_DIGEST = hashlib.sha256(SYNTHETIC_PHRASE.encode("utf-8")).hexdigest()
 SYNTHETIC_COMPACT = "".join(SYNTHETIC_PHRASE.split())
@@ -412,6 +413,24 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("fail closed", remediation_text)
         self.assertIn("Require collaborators to reclone", remediation_text)
         self.assertIn("never place sensitive plaintext there", remediation_text)
+
+    def test_history_remediation_rejects_public_conventional_cleanup_diffs(self) -> None:
+        remediation_text = HISTORY_REMEDIATION_REFERENCE.read_text(encoding="utf-8")
+
+        self.assertIn("exact patch that would become public", remediation_text)
+        self.assertIn("conventional commit, pull-request, or forge diff", remediation_text)
+        self.assertIn("do not print, paste, review, commit, push, or publish", remediation_text)
+        self.assertIn("private local path-limited stash", remediation_text)
+        self.assertIn("exact history-safe remediation path", remediation_text)
+
+    def test_release_reference_keeps_credential_edits_and_pins_fail_closed(self) -> None:
+        release_text = CI_RELEASE_REFERENCE.read_text(encoding="utf-8")
+
+        self.assertIn("credential-gated configuration", release_text)
+        self.assertIn("exact authorization for the target repositories and mappings", release_text)
+        self.assertIn("before pushing a caller", release_text)
+        self.assertIn("do not commit a pin-only mismatch", release_text)
+        self.assertIn("leave a clean worktree", release_text)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,13 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
 - Resolve exact repository names, refs, tags, release asset IDs, and workflow artifact IDs before requesting authorization.
 - Freeze pushes and merges during the rewrite window. Concurrent changes can be lost or reintroduce removed history.
 
+## Current-tree cleanup preflight
+
+- Run the bundled guard against both the proposed current tree and the exact patch that would become public. A clean resulting file does not make its conventional commit, pull-request, or forge diff safe when removed protected text remains visible in that patch.
+- If the patch guard fails, do not print, paste, review, commit, push, or publish the conventional diff. Preserve the candidate only in a private local path-limited stash or equivalent recovery snapshot, identified by metadata rather than content.
+- Leave the public branch and worktree unchanged until an exact history-safe remediation path is authorized. Do not convert the cleanup into an ordinary commit merely to make the current-tree guard pass.
+- Treat applying or publishing a history-safe replacement as the same explicit-authorization boundary as ref rewriting. Resolve the exact repositories and refs first, then follow the private recovery, isolated rewrite, verification, and authorized publication gates below.
+
 ## Private recovery snapshot
 
 1. Fetch all branches and tags in the source repository.
