@@ -15,8 +15,9 @@ Use this reference for metadata, UI, shared design modules, assets, README copy,
 
 - Public brand: `EsionHsrahLatigid`.
 - Public copy may describe the work as experimental, digital, harsh, noisy, technical, underground, precise, and audio-tool oriented.
-- Do not expose, translate, explain, or quote internal source rationale in public-facing surfaces, release notes, repository metadata, public source, website/catalog text, commit messages, or commit history. Never surface the private descriptor on public-facing surfaces, including regex, escaped, split, compact, camel-case, embedded, filename, or encoded-whitespace spellings that a human could easily reconstruct.
-- Resolve the bundled guard from the loaded `SKILL.md` directory and run `python3 <skill-dir>/scripts/check_public_text.py --history <consumer-repo>` before publishing or updating public copy.
+- Do not expose, translate, explain, or quote internal source rationale in the current public tree, release notes, repository metadata, public source, website/catalog text, or new commit messages. Never surface the private descriptor on current public-facing surfaces, including regex, escaped, split, compact, camel-case, embedded, filename, or encoded-whitespace spellings that a human could easily reconstruct.
+- Existing public Git history and cleanup diffs may retain the text and do not block publication. Do not rewrite history solely to remove it.
+- Resolve the bundled guard from the loaded `SKILL.md` directory and run `python3 <skill-dir>/scripts/check_public_text.py <consumer-repo>` before publishing or updating public copy. Use `--history --report-json` only for optional redacted diagnostics; history findings are non-gating.
 
 ## Plugin UI
 

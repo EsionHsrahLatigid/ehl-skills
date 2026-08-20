@@ -134,7 +134,7 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("public text", result.stderr)
         self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
 
-    def test_rejects_history_message_without_plaintext_fixture(self) -> None:
+    def test_allows_history_message_when_current_tree_is_clean(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init"], cwd=root, check=True, stdout=subprocess.DEVNULL)
@@ -147,8 +147,8 @@ class PublicTextGuardTests(unittest.TestCase):
 
             result = run_guard(root, "--history", "--digest", SYNTHETIC_DIGEST)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("repository history", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS", result.stdout)
         self.assertNotIn(SYNTHETIC_PHRASE, result.stderr)
 
     def test_json_report_identifies_history_message_and_blob_without_match_text(self) -> None:
@@ -172,8 +172,9 @@ class PublicTextGuardTests(unittest.TestCase):
                 SYNTHETIC_DIGEST,
             )
 
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
+        self.assertEqual(report["result"], "pass")
         self.assertEqual({finding["kind"] for finding in report["history"]}, {"history_message", "history_blob"})
         blob_finding = next(finding for finding in report["history"] if finding["kind"] == "history_blob")
         self.assertEqual(blob_finding["path"], "README.md")
@@ -205,8 +206,9 @@ class PublicTextGuardTests(unittest.TestCase):
                 SYNTHETIC_DIGEST,
             )
 
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
+        self.assertEqual(report["result"], "pass")
         path_finding = next(finding for finding in report["history"] if finding["kind"] == "history_path")
         self.assertNotIn("path", path_finding)
         self.assertRegex(path_finding["path_sha256"], r"^[0-9a-f]{64}$")
@@ -363,8 +365,8 @@ class PublicTextGuardTests(unittest.TestCase):
 
             result = run_guard(root, "--history", *SYNTHETIC_COMPACT_ARGS)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("repository history", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PASS", result.stdout)
         self.assertNotIn(SYNTHETIC_COMPACT, result.stderr)
 
     def test_skill_requires_workspace_level_ehl_evidence_tree(self) -> None:
@@ -393,13 +395,16 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("Do not treat incidental substrings such as `logo` as log evidence", text)
         self.assertIn("release notes, repository metadata, public source, website/catalog text", text)
 
-    def test_skill_routes_guard_failures_to_safe_history_remediation(self) -> None:
+    def test_skill_enforces_current_tree_without_requiring_history_rewrite(self) -> None:
         skill_text = SKILL_MD.read_text(encoding="utf-8")
         remediation_text = HISTORY_REMEDIATION_REFERENCE.read_text(encoding="utf-8")
 
         self.assertIn("references/history-remediation.md", skill_text)
-        self.assertIn("If the history guard fails, stop publication", skill_text)
-        self.assertIn("explicit authorization for the exact targets", skill_text)
+        self.assertIn("If the current-tree guard fails, clean the current public files", skill_text)
+        self.assertIn("A conventional cleanup commit is allowed", skill_text)
+        self.assertIn("Do not rewrite refs or history solely for this public-copy policy", skill_text)
+        self.assertIn("actual credential exposure", remediation_text)
+        self.assertIn("Existing history and cleanup diffs are allowed", remediation_text)
         self.assertIn("git-filter-repo` 2.47 or newer", remediation_text)
         self.assertIn("fresh clone", remediation_text)
         self.assertIn("git bundle verify", remediation_text)
@@ -414,14 +419,13 @@ class PublicTextGuardTests(unittest.TestCase):
         self.assertIn("Require collaborators to reclone", remediation_text)
         self.assertIn("never place sensitive plaintext there", remediation_text)
 
-    def test_history_remediation_rejects_public_conventional_cleanup_diffs(self) -> None:
+    def test_history_remediation_allows_conventional_current_tree_cleanup(self) -> None:
         remediation_text = HISTORY_REMEDIATION_REFERENCE.read_text(encoding="utf-8")
 
-        self.assertIn("exact patch that would become public", remediation_text)
-        self.assertIn("conventional commit, pull-request, or forge diff", remediation_text)
-        self.assertIn("do not print, paste, review, commit, push, or publish", remediation_text)
-        self.assertIn("private local path-limited stash", remediation_text)
-        self.assertIn("exact history-safe remediation path", remediation_text)
+        self.assertIn("A conventional cleanup commit is allowed", remediation_text)
+        self.assertIn("diff and resulting Git history retain removed protected text", remediation_text)
+        self.assertIn("Do not create a recovery stash or history rewrite solely", remediation_text)
+        self.assertIn("Existing cleanup stashes may be left untouched", remediation_text)
 
     def test_release_reference_keeps_credential_edits_and_pins_fail_closed(self) -> None:
         release_text = CI_RELEASE_REFERENCE.read_text(encoding="utf-8")

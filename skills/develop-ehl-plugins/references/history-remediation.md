@@ -1,6 +1,6 @@
 # Published History and Artifact Remediation
 
-Use this reference only when the bundled public-text guard fails on published history, a release asset, a workflow artifact, a cached view, or a forge-managed ref.
+Do not use this workflow merely because the private descriptor or internal rationale exists in public Git history. Existing history and cleanup diffs are allowed by policy and are non-gating. Use this reference only for actual credential exposure, a legal removal requirement, stale release/workflow artifacts that must be removed, or an explicit user request to rewrite exact public refs.
 
 ## Primary sources
 
@@ -18,10 +18,10 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
 
 ## Current-tree cleanup preflight
 
-- Run the bundled guard against both the proposed current tree and the exact patch that would become public. A clean resulting file does not make its conventional commit, pull-request, or forge diff safe when removed protected text remains visible in that patch.
-- If the patch guard fails, do not print, paste, review, commit, push, or publish the conventional diff. Preserve the candidate only in a private local path-limited stash or equivalent recovery snapshot, identified by metadata rather than content.
-- Leave the public branch and worktree unchanged until an exact history-safe remediation path is authorized. Do not convert the cleanup into an ordinary commit merely to make the current-tree guard pass.
-- Treat applying or publishing a history-safe replacement as the same explicit-authorization boundary as ref rewriting. Resolve the exact repositories and refs first, then follow the private recovery, isolated rewrite, verification, and authorized publication gates below.
+- Run the bundled guard against the proposed current tree. Current README, DESIGN, metadata, source, UI copy, release notes, and website/catalog text must pass.
+- A conventional cleanup commit is allowed even when its diff and resulting Git history retain removed protected text. Keep the commit subject and body free of the removed wording.
+- Do not create a recovery stash or history rewrite solely to clean current public copy. Existing cleanup stashes may be left untouched and are not a publication blocker once the checked-out current tree passes.
+- Continue with the remaining rewrite workflow only when the material meets this reference's stricter entry conditions: actual credentials, legal removal, stale public artifacts requiring deletion, or explicit exact-ref authorization.
 
 ## Private recovery snapshot
 
@@ -47,7 +47,7 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
 
 ## Local verification before publication
 
-- Run the bundled public-text guard with `--history` against the isolated rewritten clone.
+- Run the bundled current-tree guard against the isolated rewritten clone. Use a separate target-specific, redacted all-ref verifier for the credential or legally required material; `--history --report-json` is diagnostic and does not determine the public-text guard exit status.
 - Compare the pre- and post-rewrite default-branch tree IDs. They must remain identical when the current public tree was already clean.
 - Verify every branch and tag expected by the preflight manifest, and confirm no unexpected refs were created.
 - Define the intended push surface as the exact public `refs/heads/*` and `refs/tags/*` set. Before adding a public remote, remove `refs/backup/*`, `refs/remotes/*`, `refs/original/*`, recovery refs, and every other non-public namespace from the isolated publication clone.
@@ -74,6 +74,6 @@ Use `git-filter-repo` 2.47 or newer for `--sensitive-data-removal`. Do not subst
 ## Completion gate
 
 - Clone the remote again into a clean verification directory.
-- Run the current-tree and full-history guards there.
+- Run the current-tree guard there. For an authorized credential/legal rewrite, also run the target-specific redacted all-ref verifier and require zero remaining matches.
 - Verify default branch, tags, releases, safe assets, CI, signatures, website/catalog links, and release downloads at the rewritten SHAs.
 - Record the old-to-new mapping and verification evidence only in private approved storage and the configured internal knowledge system; never place sensitive plaintext there.

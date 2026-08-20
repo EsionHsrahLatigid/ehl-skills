@@ -208,35 +208,6 @@ def git_output(repo: Path, args: list[str]) -> bytes:
     return result.stdout
 
 
-def scan_history(
-    repo: Path,
-    forbidden_digests: set[str],
-    window_size: int,
-    forbidden_compact_digests: set[str],
-    compact_window_size: int,
-) -> bool:
-    if not (repo / ".git").exists():
-        return False
-    log_text = decode_text(git_output(repo, ["log", "--all", "--format=%B"]))
-    if log_text and contains_forbidden(log_text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
-        return True
-    commits = [line.decode("ascii") for line in git_output(repo, ["rev-list", "--all"]).splitlines() if line]
-    for commit in commits:
-        entries = [entry for entry in git_output(repo, ["ls-tree", "-rz", commit]).split(b"\0") if entry]
-        for entry in entries:
-            metadata, _, path_bytes = entry.partition(b"\t")
-            parts = metadata.split()
-            if len(parts) < 3 or parts[1] != b"blob":
-                continue
-            path_text = decode_text(path_bytes)
-            if path_text and contains_forbidden(path_text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
-                return True
-            text = decode_text(git_output(repo, ["cat-file", "-p", parts[2].decode("ascii")]))
-            if text and contains_forbidden(text, forbidden_digests, window_size, forbidden_compact_digests, compact_window_size):
-                return True
-    return False
-
-
 def safe_path_finding(
     kind: str,
     path_text: str,
@@ -397,7 +368,11 @@ def digest_arg(value: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Guard public EHL text")
     parser.add_argument("root", nargs="?", default=".", help="repository root to scan")
-    parser.add_argument("--history", action="store_true", help="also scan git commit messages and tracked text blobs")
+    parser.add_argument(
+        "--history",
+        action="store_true",
+        help="include non-gating git-history findings in --report-json output",
+    )
     parser.add_argument("--digest", action="append", type=digest_arg, default=[], help=argparse.SUPPRESS)
     parser.add_argument("--window-size", type=int, default=DEFAULT_WINDOW_SIZE, help=argparse.SUPPRESS)
     parser.add_argument("--compact-digest", action="append", type=digest_arg, default=[], help=argparse.SUPPRESS)
@@ -424,17 +399,10 @@ def main() -> None:
             forbidden_compact_digests,
             args.compact_window_size,
         )
-    history_failed = bool(history_findings) if args.report_json else args.history and scan_history(
-        root,
-        forbidden_digests,
-        args.window_size,
-        forbidden_compact_digests,
-        args.compact_window_size,
-    )
     if args.report_json:
         report = {
             "schema": "ehl-public-text-report-v1",
-            "result": "fail" if offenders or history_failed else "pass",
+            "result": "fail" if offenders else "pass",
             "current": report_current_findings(
                 root,
                 offenders,
@@ -448,8 +416,6 @@ def main() -> None:
         print(json.dumps(report, sort_keys=True, separators=(",", ":")))
     if offenders:
         fail("internal brand rationale found in public text")
-    if history_failed:
-        fail("internal brand rationale found in repository history")
     if not args.report_json:
         print("PASS: public text guard")
 
